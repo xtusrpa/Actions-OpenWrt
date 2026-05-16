@@ -18,3 +18,12 @@ sed -i 's/192.168.1.1/192.168.88.166/g' package/base-files/files/bin/config_gene
 
 # Modify hostname
 sed -i 's/ImmortalWrt/Immortal-Router/g' package/base-files/files/bin/config_generate
+
+# 1. 创建 OpenClash 内核的存放目录
+mkdir -p files/etc/openclash/core
+
+# 2. 下载 Meta 内核 (x86_64 架构)
+wget -qO- https://raw.githubusercontent.com/vernesong/OpenClash/core/master/meta/clash-linux-amd64.tar.gz | tar xOvz > files/etc/openclash/core/clash_meta
+
+# 3. 赋予内核执行权限
+chmod +x files/etc/openclash/core/clash*
