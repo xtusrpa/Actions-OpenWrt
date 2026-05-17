@@ -24,7 +24,7 @@ on:
 
 env:
   REPO_URL: https://github.com/immortalwrt/immortalwrt
-  REPO_BRANCH: master # 如果追求 x86 软路由的极致稳定，可改为 openwrt-23.05
+  REPO_BRANCH: openwrt-24.10 # 如果追求 x86 软路由的极致稳定，可改为 openwrt-23.05
   FEEDS_CONF: feeds.conf.default
   CONFIG_FILE: immortalwrt.config
   DIY_P1_SH: diy-part1.sh
