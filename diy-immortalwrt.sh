@@ -1,34 +1,46 @@
 #!/bin/bash
 #
 # https://github.com/P3TERX/Actions-OpenWrt
-# File name: diy-immortalwrt.sh
-# Description: OpenWrt DIY script part 2 (After Update feeds)
+# 文件名: diy-immortalwrt.sh
+# 描述: OpenWrt/ImmortalWrt DIY 自定义脚本第二部分 (在更新和安装 feeds 软件包之后执行)
 #
-# Copyright (c) 2019-2024 P3TERX <https://p3terx.com>
+# 版权所有 (c) 2019-2024 P3TERX <https://p3terx.com>
 #
-# This is free software, licensed under the MIT License.
-# See /LICENSE for more information.
+# 本软件是自由软件，遵循 MIT 开源协议。
+# 详情请参阅 /LICENSE 文件。
 #
 
-# Modify default IP
+# 修改默认后台管理 IP 地址
+# 作用: 编译出的固件刷入机器后，默认访问后台的 IP 就是 192.168.88.166
 sed -i 's/192.168.1.1/192.168.88.166/g' package/base-files/files/bin/config_generate
 
-# Modify default theme
+# 修改默认界面主题 (目前处于被注释关闭状态)
+# 作用: 默认的主题是 bootstrap，如果去掉开头的 # 号，默认主题将变为漂亮的 argon 主题
 #sed -i 's/luci-theme-bootstrap/luci-theme-argon/g' feeds/luci/collections/luci/Makefile
 
-# Modify hostname
-sed -i 's/ImmortalWrt/Immortal-Router/g' package/base-files/files/bin/config_generate
+# 修改系统主机名 (路由器名称)
+# 作用: 将系统默认显示的 "ImmortalWrt" 替换为指定的 "xtusrpa-immortalwrt"
+sed -i 's/ImmortalWrt/xtusrpa-immortalwrt/g' package/base-files/files/bin/config_generate
 
-# 1. 创建 OpenClash 内核存放目录
+# -------------------------------------------------------------------------
+# 以下操作用于在编译阶段提前预置 OpenClash 的核心文件 (Core)
+# 这样刷机后就不用再手动连接 GitHub 下载内核了，直接可用，避免因为网络问题导致插件无法启动
+# -------------------------------------------------------------------------
+
+# 1. 创建预置 OpenClash 内核的专属本地存放目录
+# 作用: 在源码目录中创建 files 文件夹（编译时这个目录下的文件会被直接原样塞进固件系统的根目录下）
 mkdir -p files/etc/openclash/core
 
-# 2. 下载 Meta 内核，并解压重命名为 clash_meta
-echo "Downloading Meta Core..."
+# 2. 下载 Meta 内核
+# 作用: 从官方核心库下载 amd64 (x86_64) 架构的 Meta 内核压缩包，直接解压并将核心文件提取重命名为 clash_meta，放入刚才创建的预置目录
+echo "正在下载 OpenClash Meta 内核..."
 wget -qO- https://raw.githubusercontent.com/vernesong/OpenClash/core/master/meta/clash-linux-amd64.tar.gz | tar xOvz > files/etc/openclash/core/clash_meta
 
-# 3. 下载 Premium (TUN) 内核，并解压重命名为 clash_tun
-echo "Downloading TUN Core..."
+# 3. 下载 Premium (TUN) 内核
+# 作用: 从官方核心库下载用于接管全局流量的 TUN 闭源内核，解压并将核心文件提取重命名为 clash_tun，同样放入预置目录
+echo "正在下载 OpenClash TUN 内核..."
 wget -qO- https://raw.githubusercontent.com/vernesong/OpenClash/core/master/premium/clash-linux-amd64-2023.08.17.tar.gz | tar xOvz > files/etc/openclash/core/clash_tun
 
-# 4. 赋予所有内核最高执行权限
+# 4. 赋予内核文件可执行权限
+# 作用: 给所有存入预置目录且名字以 clash 开头的文件赋予最高执行权限 (+x)，确保路由器开机后插件可以直接调用内核运行
 chmod +x files/etc/openclash/core/clash*
