@@ -19,10 +19,10 @@ on:
       ssh:
         description: 'SSH connection to Actions'
         required: false
-        default: 'true' # 测试时建议默认关闭，需要时在网页端手动勾选开启
+        default: 'true'
         type: boolean
 
-# 显式声明权限，确保底部的 github-script 有权删除 Release 和旧 Tag
+# ⚡ 核心修复 1：显式赋予 actions 写入和 contents 写入权限，防止底部的脚本删除 Tag 时报 403 权限错误
 permissions:
   contents: write
   actions: write
@@ -181,14 +181,19 @@ jobs:
           if (releases.length > KEEP_LATEST) {
             const toDelete = releases.slice(KEEP_LATEST);
             for (const release of toDelete) {
-              console.log(`Deleting old release: ${release.tag_name}`);
+              console.log(`Processing deletion for old release: ${release.tag_name}`);
               
-              // 1. 删除 Release 记录
-              await github.rest.repos.deleteRelease({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                release_id: release.id,
-              });
+              // 1. 删除过期的 Release 记录（加入错误捕捉，防止手动误删引发报错）
+              try {
+                await github.rest.repos.deleteRelease({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  release_id: release.id,
+                });
+                console.log(`Successfully deleted release record: ${release.tag_name}`);
+              } catch (err) {
+                console.error(`Failed to delete release record ${release.tag_name}: ${err.message}`);
+              }
               
               // 2. 删除对应的 Git Tag
               try {
@@ -197,9 +202,9 @@ jobs:
                   repo: context.repo.repo,
                   ref: `tags/${release.tag_name}`,
                 });
-                console.log(`Successfully deleted tag: ${release.tag_name}`);
+                console.log(`Successfully deleted Git tag: ${release.tag_name}`);
               } catch (error) {
-                console.error(`Failed to delete tag ${release.tag_name}: ${error.message}`);
+                console.error(`Failed to delete Git tag ${release.tag_name}: ${error.message}`);
               }
             }
           }
