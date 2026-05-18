@@ -19,8 +19,13 @@ on:
       ssh:
         description: 'SSH connection to Actions'
         required: false
-        default: 'true'
+        default: 'true' # 测试时建议默认关闭，需要时在网页端手动勾选开启
         type: boolean
+
+# 显式声明权限，确保底部的 github-script 有权删除 Release 和旧 Tag
+permissions:
+  contents: write
+  actions: write
 
 env:
   REPO_URL: https://github.com/coolsnowwolf/lede
@@ -86,7 +91,7 @@ jobs:
 
     - name: SSH connection to Actions
       uses: P3TERX/ssh2actions@v1.0.0
-      if: (github.event.inputs.ssh == 'true' && github.event.inputs.ssh  != 'false') || contains(github.event.action, 'ssh')
+      if: (github.event.inputs.ssh == 'true' && github.event.inputs.ssh != 'false') || contains(github.event.action, 'ssh')
       
     - name: Download package
       id: package
