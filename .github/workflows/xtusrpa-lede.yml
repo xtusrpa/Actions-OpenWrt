@@ -10,7 +10,7 @@
 # See /LICENSE for more information.
 #
 
-name: LEDE 固件编译测试流水线 (Node24 修复版)
+name: LEDE 固件编译流水线 (Node24 修复版)
 
 on:
   repository_dispatch:
