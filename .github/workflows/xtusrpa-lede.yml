@@ -2,7 +2,7 @@
 # https://github.com/P3TERX/Actions-OpenWrt
 #
 # File: .github/workflows/lede-test.yml
-# Description: Build OpenWrt using GitHub Actions (Node.js 24 Fix Test)
+# Description: Build OpenWrt using GitHub Actions
 #
 # Copyright (c) 2019-2024 P3TERX <https://p3terx.com>
 #
@@ -22,7 +22,7 @@ on:
         default: 'true'
         type: boolean
 
-# ⚡ 核心修复 1：显式赋予 actions 写入和 contents 写入权限，防止底部的脚本删除 Tag 时报 403 权限错误
+# 显式赋予流水线完整的写入权限，确保清理旧 Release、旧运行记录和 Git Tags 时不会触发 403 错误
 permissions:
   contents: write
   actions: write
@@ -183,7 +183,7 @@ jobs:
             for (const release of toDelete) {
               console.log(`Processing deletion for old release: ${release.tag_name}`);
               
-              // 1. 删除过期的 Release 记录（加入错误捕捉，防止手动误删引发报错）
+              // 1. 删除过期的 Release 记录
               try {
                 await github.rest.repos.deleteRelease({
                   owner: context.repo.owner,
