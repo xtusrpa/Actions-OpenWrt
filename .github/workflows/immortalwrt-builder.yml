@@ -27,7 +27,7 @@ permissions:
 # 定义全局环境变量
 env:
   REPO_URL: https://github.com/immortalwrt/immortalwrt # 目标源码仓库地址
-  REPO_BRANCH: mastr                           # 目标分支（x86 追求稳定可改为 openwrt-23.05）
+  REPO_BRANCH: master                           # 目标分支（x86 追求稳定可改为 openwrt-23.05）
   FEEDS_CONF: feeds.conf.default                       # 默认的软件源配置文件名
   CONFIG_FILE: immortalwrt.config                      # 你的自定义 .config 配置文件名
   DIY_P1_SH: diy-part1.sh                              # 更新 feeds 前执行的自定义脚本
