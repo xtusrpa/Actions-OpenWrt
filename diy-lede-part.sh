@@ -11,28 +11,18 @@
 #
 
 # =================================================================
-# 1. 取消注释默认的 helloworld 源 (当前被注释)
-# 作用：大雕的 LEDE 源码里自带了 helloworld 源，但默认是被 '#' 注释掉的。
-# 删掉行首的 '#' 就可以激活它。
+# 1. 剔除不用且容易冲突的 helloworld (SSR-Plus)
 # =================================================================
 #sed -i 's/^#\(.*helloworld\)/\1/' feeds.conf.default
-
-
-# =================================================================
-# 2. 追加 helloworld 软件源 (当前生效)
-# 作用：强行向源列表里写入 helloworld 的仓库地址。
-# 结果：你能在编译菜单 (make menuconfig) 里找到并安装 "luci-app-ssr-plus" 插件。
-# =================================================================
-echo 'src-git helloworld https://github.com/fw876/helloworld' >>feeds.conf.default
-
+#echo 'src-git helloworld https://github.com/fw876/helloworld' >>feeds.conf.default
 
 # =================================================================
-# 3. 追加 Passwall 软件源 (当前被注释)
-# 作用：引入著名科学插件 Passwall 的源码。因为行首有 '#'，所以不会生效。
-# 如果你想用 Passwall，可以把这行最前面的 '#' 删掉。
+# 2. 追加 OpenClash 官方源 (核心代理)
 # =================================================================
-#echo 'src-git passwall https://github.com/xiaorouji/openwrt-passwall' >>feeds.conf.default
-
-
-# 追加 OpenClash 软件源 后面出问题可用井号注释掉
 echo 'src-git openclash https://github.com/vernesong/OpenClash.git' >>feeds.conf.default
+
+# =================================================================
+# 3. 追加 MosDNS 和其他常用极客插件包的综合源 (kenzok8/small)
+# 作用：提供最新的 MosDNS、网易云解锁等 Lean 源码里缺失的插件
+# =================================================================
+echo 'src-git smpackage https://github.com/kenzok8/small-package' >>feeds.conf.default
