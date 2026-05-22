@@ -44,3 +44,37 @@ wget -qO- https://raw.githubusercontent.com/vernesong/OpenClash/core/master/prem
 # 4. 赋予内核文件可执行权限
 # 作用: 给所有存入预置目录且名字以 clash 开头的文件赋予最高执行权限 (+x)，确保路由器开机后插件可以直接调用内核运行
 chmod +x files/etc/openclash/core/clash*
+
+# -------------------------------------------------------------------------
+# 自定义 LAN 口网关和 DNS
+# 作用: 自动生成 uci-defaults 脚本，让系统首次开机时自动配置网关和 DNS
+# -------------------------------------------------------------------------
+
+# 创建 uci-defaults 存放目录
+mkdir -p files/etc/uci-defaults
+
+# 写入网络配置代码 (EOF 之间的内容会被自动写入 99-custom-network 文件中)
+cat << "EOF" > files/etc/uci-defaults/99-custom-network
+#!/bin/sh
+
+# 自定义 LAN 口网关 (请根据你的主路由 IP 自行修改)
+uci set network.lan.gateway='192.168.88.1'
+
+# 自定义 LAN 口 DNS (可以添加多个)
+uci add_list network.lan.dns='202.99.224.68'
+uci add_list network.lan.dns='202.99.224.67'
+uci add_list network.lan.dns='202.99.224.8'
+
+# 如果你把它作为旁路由，防止和主路由冲突，可以取消下面这行的注释来关闭 DHCP
+uci set dhcp.lan.ignore='1' && uci commit dhcp
+
+# 提交保存网络配置
+uci commit network
+
+# 执行完毕后删除自身，避免以后每次重启都执行
+rm -f /etc/uci-defaults/99-custom-network
+exit 0
+EOF
+
+# 赋予该脚本可执行权限
+chmod +x files/etc/uci-defaults/99-custom-network
