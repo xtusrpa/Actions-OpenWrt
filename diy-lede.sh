@@ -84,7 +84,7 @@ uci add_list network.lan.dns='202.99.224.67'
 uci add_list network.lan.dns='202.99.224.8'
 
 # 如果你把它作为旁路由，防止和主路由冲突，可以取消下面这行的注释来关闭 DHCP
-# uci set dhcp.lan.ignore='1' && uci commit dhcp
+uci set dhcp.lan.ignore='1' && uci commit dhcp
 
 # 提交保存网络配置
 uci commit network
