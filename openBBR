@@ -1,0 +1,24 @@
+在 GitHub Actions 的编译流程中，part2.sh 脚本通常用于在拉取完源码和插件后，对系统的默认配置文件进行深度定制。
+
+你可以直接在这个脚本中写入命令，将 BBR 的开启参数提前注入到 OpenWrt 源码的 sysctl.conf 模板文件中。这样编译出来的固件，刷机后第一次开机就会原生默认开启 BBR，不需要你再通过 SSH 手动输入。
+怎么操作？
+
+打开你 GitHub 仓库中的 part2.sh（或者对应的自定义脚本文件），在文件的末尾添加以下两行代码：
+# 修改系统默认的 sysctl.conf，使其在刷机后默认开启 BBR
+echo "net.core.default_qdisc=fq" >> package/base-files/files/etc/sysctl.conf
+echo "net.ipv4.tcp_congestion_control=bbr" >> package/base-files/files/etc/sysctl.conf
+原理解释：
+package/base-files/files/etc/sysctl.conf 是 OpenWrt 源码中负责生成最终固件 /etc/sysctl.conf 文件的基础模板。你在编译阶段把这两句话塞进模板里，等固件编译打包好、刷到你的软路由里时，系统底层就天然自带 BBR 配置了。
+⚠️ 必须注意的一个前提：需要勾选 BBR 内核模块
+
+光有配置文件的参数还不够，你的固件里必须得有 BBR 的“驱动”（内核模块）。
+
+在你生成用于 GitHub Actions 编译的 .config 配置文件（也就是你平时在本地或者云端跑 make menuconfig 出来的那个文件）时，一定要确保选中了 kmod-tcp-bbr 插件。
+
+检查路径如下：
+
+    进入 Kernel modules -> Network Support
+
+    找到并勾选 <*> kmod-tcp-bbr
+
+只要你的 .config 配置文件里包含了 CONFIG_PACKAGE_kmod-tcp-bbr=y，再加上你在 part2.sh 里注入的那两行代码，下次编译出来的固件就会是一个完美纯净、原生自带且默认开启 BBR 的高性能路由系统了。配合你现有的 OpenClash 节点，体验会非常丝滑
