@@ -78,5 +78,10 @@ EOF
 
 # 赋予该脚本可执行权限
 chmod +x files/etc/uci-defaults/99-custom-network
+
+# -------------------------------------------------------------------------
+# 拉取 MosDNS v5 及 v2ray-geodata 依赖源码
+# 作用: 确保编译阶段能找到 MosDNS 及其运行所需的地理位置数据
+# -------------------------------------------------------------------------
 git clone https://github.com/sbwml/luci-app-mosdns -b v5 package/mosdns
 git clone https://github.com/sbwml/v2ray-geodata package/v2ray-geodata
