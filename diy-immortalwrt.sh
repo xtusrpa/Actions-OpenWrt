@@ -75,10 +75,3 @@ uci commit network
 rm -f /etc/uci-defaults/99-custom-network
 exit 0
 EOF
-# 移除源码中可能自带的旧版 mosdns，防止冲突
-rm -rf feeds/packages/net/mosdns
-rm -rf feeds/packages/net/v2ray-geodata
-
-# 拉取最新的 MosDNS 及 GeoData 依赖
-git clone https://github.com/sbwml/luci-app-mosdns -b v5 package/mosdns
-git clone https://github.com/sbwml/v2ray-geodata package/v2ray-geodata
