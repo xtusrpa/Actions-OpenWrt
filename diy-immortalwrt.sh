@@ -78,3 +78,5 @@ EOF
 
 # 赋予该脚本可执行权限
 chmod +x files/etc/uci-defaults/99-custom-network
+git clone https://github.com/sbwml/luci-app-mosdns -b v5 package/mosdns
+git clone https://github.com/sbwml/v2ray-geodata package/v2ray-geodata
