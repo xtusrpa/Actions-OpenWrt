@@ -96,3 +96,13 @@ EOF
 
 # 赋予该脚本可执行权限
 chmod +x files/etc/uci-defaults/99-custom-network
+
+# =========================================================
+# 手动拉取 MosDNS 和对应的 Geo 数据库源码 (适用于 LEDE)
+# =========================================================
+
+# 拉取 MosDNS v5 版本源码
+git clone -b v5 https://github.com/sbwml/luci-app-mosdns package/mosdns
+
+# 拉取 v2ray-geodata 数据库（替代原来的 v2ray-geoip/geosite）
+git clone https://github.com/sbwml/v2ray-geodata package/v2ray-geodata
