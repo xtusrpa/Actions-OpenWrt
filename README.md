@@ -20,3 +20,4 @@ qm importdisk 102 DSM.qcow2 local-lvm               #镜像挂载
 
 插件：openclash   homepoxy up/np  KMS服务器 
 
+https://cdn.jsdelivr.net/gh/xtusrpa/my-icons/tree/main/openwrt/tianling24.png
