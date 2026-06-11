@@ -16,7 +16,7 @@ qemu-img convert -f raw -O qcow2 DSM.img DSM.qcow2  #镜像转换
 qm importdisk 102 DSM.qcow2 local-lvm               #镜像挂载
 
 
-#### 天灵编译线
+#### 天灵 ImmortalWrt 固件
 
 插件：openclash   homepoxy up/np  KMS服务器 
 
