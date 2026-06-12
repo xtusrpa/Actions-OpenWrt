@@ -46,7 +46,19 @@ jobs:
     - name: 检出当前仓库代码
       uses: actions/checkout@v4 # 【修复】使用稳定的 v4 版本
 
-    # 2. 极其关键的一步：清理 Ubuntu 运行环境，释放大量磁盘空间，并安装所有编译 OpenWrt 所需的依赖项
+    # 【新增步骤】极致清理 Ubuntu 运行环境，释放最大化磁盘空间
+    - name: 释放最大磁盘空间 (Free Disk Space)
+      uses: jlumbroso/free-disk-space@main
+      with:
+        tool-cache: true
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: true
+        docker-images: true
+        swap-storage: true
+
+    # 2. 初始化编译环境，安装所有编译 OpenWrt 所需的依赖项
     - name: 初始化编译环境
       env:
         DEBIAN_FRONTEND: noninteractive # 防止安装过程中弹出交互式对话框卡住流水线
