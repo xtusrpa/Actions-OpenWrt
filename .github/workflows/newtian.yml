@@ -5,7 +5,7 @@
 # 描述: 使用 GitHub Actions 编译 OpenWrt/ImmortalWrt
 #
 
-name: 天灵 最新ImmortalWrt 编译流水线
+name: 天灵 25.12 编译流水线
 
 on:
   # 允许外部通过 API 触发此工作流
