@@ -190,7 +190,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        name: 天灵 最新ImmortalWrt 编译流水线 ${{ steps.tag.outputs.release_tag }}
+        name: 天灵 25.12 编译流水线 ${{ steps.tag.outputs.release_tag }}
         tag_name: ${{ steps.tag.outputs.release_tag }}
         body_path: release.txt
         files: ${{ env.FIRMWARE }}/*
