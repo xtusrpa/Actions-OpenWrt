@@ -85,7 +85,7 @@ jobs:
     - name: 安装软件源 (Install feeds)
       run: cd openwrt && ./scripts/feeds install -a
 
-    # 7. 注入你的 .config 文件，并执行第二个自定义脚本（通常用于修改默认 IP、主机名、替换默认主题等）
+    # 7. 注入你的 .config 文件，并执行第二个自定义脚本
     - name: 加载自定义配置 (diy-immortalwrt.sh)
       run: |
         [ -e files ] && mv files openwrt/files
@@ -93,13 +93,33 @@ jobs:
         chmod +x $DIY_P2_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
+        
+        # 【新增补充：强制开启 OpenWrt 编译缓存支持】
+        echo "CONFIG_CCACHE=y" >> .config
 
-    # 【核心修复 2】8. 开启 tmate SSH 连接，方便在编译前介入容器检查配置（如执行 make menuconfig）
+    # 【新增补充：引入 GitHub Actions 缓存机制，存储下载的包和编译中间件】
+    - name: 缓存源码包 (Cache dl directory)
+      uses: actions/cache@v4
+      with:
+        path: openwrt/dl
+        key: ${{ runner.os }}-openwrt-dl-${{ hashFiles('openwrt/feeds.conf.default') }}
+        restore-keys: |
+          ${{ runner.os }}-openwrt-dl-
+
+    - name: 缓存编译中间件 (Cache .ccache)
+      uses: actions/cache@v4
+      with:
+        path: openwrt/.ccache
+        key: ${{ runner.os }}-openwrt-ccache-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-openwrt-ccache-
+
+    # 【核心修复 2】8. 开启 tmate SSH 连接，方便在编译前介入容器检查配置
     - name: SSH 连接到 Actions 运行环境
       uses: mxschmitt/action-tmate@v3
       if: (github.event.inputs.ssh == 'true' && github.event.inputs.ssh != 'false') || contains(github.event.action, 'ssh')
 
-    # 9. 预下载所有编译需要用到的依赖包（多线程下载，并在下载后清理小于 1KB 的无效文件）
+    # 9. 预下载所有编译需要用到的依赖包
     - name: 下载编译所需的软件包
       id: package
       run: |
@@ -130,7 +150,7 @@ jobs:
 
     # 12. （可选）上传包含所有编译产物的 bin 目录作为 Artifacts
     - name: 上传 bin 目录
-      uses: actions/upload-artifact@v4 # 【修复】使用稳定的 v4 版本
+      uses: actions/upload-artifact@v4
       if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
       with:
         name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
@@ -148,7 +168,7 @@ jobs:
 
     # 14. 上传整理好的固件目录作为 Artifacts（供在 Actions 页面直接下载）
     - name: 上传固件目录
-      uses: actions/upload-artifact@v4 # 【修复】使用稳定的 v4 版本
+      uses: actions/upload-artifact@v4
       if: steps.organize.outputs.status == 'success' && !cancelled()
       with:
         name: ImmortalWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
@@ -165,12 +185,11 @@ jobs:
 
     # 16. 创建 GitHub Release 并将固件文件作为附件上传
     - name: 将固件发布到 Release
-      uses: softprops/action-gh-release@v2 # 【修复】使用稳定的 v2 版本
+      uses: softprops/action-gh-release@v2
       if: steps.tag.outputs.status == 'success' && !cancelled()
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        # 修改点：将此处的名字改成了与流水线一致，并保留了标签作为后缀
         name: 天灵 最新ImmortalWrt 编译流水线 ${{ steps.tag.outputs.release_tag }}
         tag_name: ${{ steps.tag.outputs.release_tag }}
         body_path: release.txt
@@ -178,14 +197,14 @@ jobs:
 
     # 17. 清理过去的 Actions 运行记录，保持页面整洁
     - name: 删除旧的 workflow 运行记录
-      uses: Mattraks/delete-workflow-runs@v2 # 【修复】使用稳定的 v2 版本
+      uses: Mattraks/delete-workflow-runs@v2
       with:
         retain_days: 0
         keep_minimum_runs: 2
 
     # 【核心修复 3】18. 原生脚本替代高风险的第三方插件：自动清理超过 3 个历史的 Release 及其对应的 Git Tag
     - name: 自动清理旧的 Releases
-      uses: actions/github-script@v7 # 【修复】使用稳定的 v7 版本
+      uses: actions/github-script@v7
       if: env.UPLOAD_RELEASE == 'true' && !cancelled()
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
