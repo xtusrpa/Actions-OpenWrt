@@ -106,3 +106,6 @@ git clone -b v5 https://github.com/sbwml/luci-app-mosdns package/mosdns
 
 # 拉取 v2ray-geodata 数据库（替代原来的 v2ray-geoip/geosite）
 git clone https://github.com/sbwml/v2ray-geodata package/v2ray-geodata
+
+# 将 sirpdboy 的 luci-app-ddns-go 源码克隆到 package/luci-app-ddns-go 目录
+git clone https://github.com/sirpdboy/luci-app-ddns-go.git package/luci-app-ddns-go
