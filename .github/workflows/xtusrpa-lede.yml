@@ -47,16 +47,16 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Maximize build space
-      uses: easimon/maximize-build-space@master
+    - name: Free Disk Space (Ubuntu)
+      uses: jlumbroso/free-disk-space@main
       with:
-        root-reserve-mb: 512
-        swap-size-mb: 1024
-        remove-dotnet: 'true'
-        remove-android: 'true'
-        remove-haskell: 'true'
-        remove-codeql: 'true'
-        remove-docker-images: 'true'
+        tool-cache: false
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: true
+        docker-images: true
+        swap-storage: true
 
     - name: Initialization environment
       env:
@@ -189,33 +189,4 @@ jobs:
           
           const KEEP_LATEST = 3;
           
-          if (releases.length > KEEP_LATEST) {
-            const toDelete = releases.slice(KEEP_LATEST);
-            for (const release of toDelete) {
-              console.log(`Processing deletion for old release: ${release.tag_name}`);
-              
-              // 1. 删除过期的 Release 记录
-              try {
-                await github.rest.repos.deleteRelease({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  release_id: release.id,
-                });
-                console.log(`Successfully deleted release record: ${release.tag_name}`);
-              } catch (err) {
-                console.error(`Failed to delete release record ${release.tag_name}: ${err.message}`);
-              }
-              
-              // 2. 删除对应的 Git Tag
-              try {
-                await github.rest.git.deleteRef({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  ref: `tags/${release.tag_name}`,
-                });
-                console.log(`Successfully deleted Git tag: ${release.tag_name}`);
-              } catch (error) {
-                console.error(`Failed to delete Git tag ${release.tag_name}: ${error.message}`);
-              }
-            }
-          }
+          if (releases.length >
