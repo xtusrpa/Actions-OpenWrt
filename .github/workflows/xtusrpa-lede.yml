@@ -175,6 +175,7 @@ jobs:
       with:
         retain_days: 0
         keep_minimum_runs: 2
+
     - name: Remove old Releases
       uses: actions/github-script@v7
       if: steps.compile.outputs.status == 'success' && env.UPLOAD_RELEASE == 'true' && !cancelled()
