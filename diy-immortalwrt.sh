@@ -75,3 +75,10 @@ uci commit network
 rm -f /etc/uci-defaults/99-custom-network
 exit 0
 EOF
+# 1. 强行删掉天灵官方 packages 目录里那个孤零零的旧核心，防止同名冲突
+rm -rf feeds/packages/net/mosdns
+rm -rf feeds/packages/net/v2dat
+
+# 2. 直接拉取专门适配天灵/OpenWrt 的全套 MosDNS 源码
+git clone --depth=1 https://github.com/sbwml/luci-app-mosdns package/luci-app-mosdns
+git clone --depth=1 https://github.com/sbwml/v2dat package/v2dat
