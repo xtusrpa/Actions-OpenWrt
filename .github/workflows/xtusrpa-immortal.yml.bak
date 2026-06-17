@@ -1,7 +1,7 @@
 #
 # https://github.com/P3TERX/Actions-OpenWrt
 #
-# File: .github/workflows/openwrt-builder.yml
+# File: .github/workflows/lede-test.yml
 # Description: Build OpenWrt using GitHub Actions
 #
 # Copyright (c) 2019-2024 P3TERX <https://p3terx.com>
@@ -10,7 +10,7 @@
 # See /LICENSE for more information.
 #
 
-name: xtusrpa天灵 ImmortalWrt 编译流水线
+name: LEDE 固件编译流水线 (Node24 修复版)
 
 on:
   repository_dispatch:
@@ -22,18 +22,18 @@ on:
         default: 'true'
         type: boolean
 
-# 顯式賦予流水線完整的寫入權限，確保清理舊 Release、舊運行記錄和 Git Tags 時不會觸發 403 錯誤
+# 显式赋予流水线完整的写入权限，确保清理旧 Release、旧运行记录和 Git Tags 时不会触发 403 错误
 permissions:
   contents: write
   actions: write
 
 env:
-  REPO_URL: https://github.com/immortalwrt/immortalwrt
-  REPO_BRANCH: openwrt-24.10 # 如果追求 x86 軟路由的極致穩定，可改為 openwrt-23.05
+  REPO_URL: https://github.com/coolsnowwolf/lede
+  REPO_BRANCH: master
   FEEDS_CONF: feeds.conf.default
-  CONFIG_FILE: immortalwrt.config
+  CONFIG_FILE: xtusrpa-lede.config
   DIY_P1_SH: diy-part1.sh
-  DIY_P2_SH: diy-immortalwrt.sh
+  DIY_P2_SH: diy-lede.sh
   UPLOAD_BIN_DIR: false
   UPLOAD_FIRMWARE: true
   UPLOAD_RELEASE: true
@@ -44,12 +44,21 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-    # 註釋：簽出當前倉庫的原始碼，讓流水線能讀取到你上傳的 ipk 檔案和自定義腳本
-    - name: 簽出代碼 (Checkout)
+    - name: Checkout
       uses: actions/checkout@v4
 
-    # 註釋：初始化 Ubuntu 編譯環境，卸載不需要的內建軟體以釋放空間，並安裝編件必備的依賴包
-    - name: 初始化編譯環境 (Initialization environment)
+    - name: Free Disk Space (Ubuntu)
+      uses: jlumbroso/free-disk-space@main
+      with:
+        tool-cache: false
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: true
+        docker-images: true
+        swap-storage: true
+
+    - name: Initialization environment
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
@@ -63,32 +72,27 @@ jobs:
         sudo mkdir -p /workdir
         sudo chown $USER:$GROUPS /workdir
 
-    # 註釋：從遠端官方倉庫克隆指定的 ImmortalWrt 分支原始碼到工作目錄
-    - name: 下載原始碼 (Clone source code)
+    - name: Clone source code
       working-directory: /workdir
       run: |
         df -hT $PWD
         git clone $REPO_URL -b $REPO_BRANCH openwrt
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
-    # 註釋：載入自定義的 feeds 設定檔，並執行第一階段自定義腳本（diy-part1.sh）
-    - name: 載入自定義 Feeds (Load custom feeds)
+    - name: Load custom feeds
       run: |
         [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
         chmod +x $DIY_P1_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P1_SH
 
-    # 註釋：更新 Feeds 套件源，獲取最新的軟體包清單
-    - name: 更新 Feeds 套件源 (Update feeds)
+    - name: Update feeds
       run: cd openwrt && ./scripts/feeds update -a
 
-    # 註釋：安裝 Feeds 套件，將軟體包整合到編譯選單的架構中
-    - name: 安裝 Feeds 套件 (Install feeds)
+    - name: Install feeds
       run: cd openwrt && ./scripts/feeds install -a
 
-    # 註釋：將你的自定義配置文件（.config）和第二階段自定義腳本（diy-immortalwrt.sh）載入進編譯目錄
-    - name: 載入自定義配置 (Load custom configuration)
+    - name: Load custom configuration
       run: |
         [ -e files ] && mv files openwrt/files
         [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
@@ -96,50 +100,11 @@ jobs:
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
-    # 註釋：動態建立覆蓋目錄，並將你上傳至倉庫的 Mosdns 相關 IPK 套件按 1->2->3->4 的嚴格依賴順序寫入開機啟動腳本
-    - name: 配置本地 Mosdns 開機自動安裝腳本
-      run: |
-        cd openwrt
-        
-        # 1. 建立固件檔案覆蓋目錄
-        mkdir -p files/etc/uci-defaults
-        mkdir -p files/root/ipks
-
-        # 2. 將你 GitHub 倉庫中的 ipk 檔案複製到 files 檔案夾中
-        cp -f $GITHUB_WORKSPACE/ipk/im/*.ipk files/root/ipks/
-
-        # 3. 生成嚴格按順序執行的開機啟動腳本
-        cat << 'EOF' > files/etc/uci-defaults/99-install-mosdns
-        #!/bin/sh
-        if [ -d "/root/ipks" ]; then
-            logger -t "UCI-DEFAULTS" "發現本地離線安裝包，開始按指定順序安裝 Mosdns..."
-            
-            # 嚴格按依賴順序靜默安裝，屏蔽常規報錯輸出
-            opkg install /root/ipks/v2dat_*.ipk 2>/dev/null
-            opkg install /root/ipks/mosdns_*.ipk 2>/dev/null
-            opkg install /root/ipks/luci-app-mosdns_*.ipk 2>/dev/null
-            opkg install /root/ipks/luci-i18n-mosdns-zh-cn_*.ipk 2>/dev/null
-            
-            # 兜底強制安裝並忽略依賴衝突
-            opkg install /root/ipks/*.ipk --force-depends 2>/dev/null
-            
-            # 清理垃圾
-            rm -rf /root/ipks
-            logger -t "UCI-DEFAULTS" "Mosdns 安裝與清理完成！"
-        fi
-        exit 0
-        EOF
-
-        # 4. 賦予腳本執行權限
-        chmod +x files/etc/uci-defaults/99-install-mosdns
-
-    # 註釋：網頁端互動偵錯工具。如果觸發編譯時開啟了 SSH 選項，流程會在此暫停並提供連線方式，方便手動選菜單
-    - name: SSH 遠端連接偵錯 (SSH connection to Actions)
+    - name: SSH connection to Actions
       uses: mxschmitt/action-tmate@v3
       if: (github.event.inputs.ssh == 'true' && github.event.inputs.ssh != 'false') || contains(github.event.action, 'ssh')
       
-    # 註釋：根據設定檔預先下載編譯所需的軟體原始碼依賴包（dl 庫），避免編譯時一邊下載一邊編譯導致超時報錯
-    - name: 下載軟體依賴包 (Download package)
+    - name: Download package
       id: package
       run: |
         cd openwrt
@@ -148,91 +113,72 @@ jobs:
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
 
-    # 註釋：開始核心編譯。優先使用最大執行緒全速衝刺；若出錯則退回單執行緒慢速排錯編編，並輸出詳細日誌（V=s）
-    - name: 编译固件 (Compile the firmware)
+    - name: Compile the firmware
       id: compile
       run: |
         cd openwrt
         echo -e "$(nproc) thread compile"
-        # 核心編譯邏輯：
-        # 1. 首先嘗試使用全部 CPU 線程 $(nproc) 全速編譯。
-        # 2. 如果多線程跑出錯了，立刻降級到單線程 (make -j1) 重新跑，以規避多線程併發導致的玄學報錯。
-        # 3. 如果單線程還是報錯了，再用單線程+詳細日誌 (V=s) 跑最後一次，方便在 Actions 面板裡查錯。
         make -j$(nproc) || make -j1 || make -j1 V=s
-        
-        # 寫入成功狀態
         echo "status=success" >> $GITHUB_OUTPUT
-        
-        # 從 .config 中提取當前編譯的設備型號 (例如 x86_64)
         grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
         [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
-        
-        # 生成編譯時間戳，用於給固件文件命名
         echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
 
-    # 註釋：不論編譯成功與否，列印當前虛擬機器的磁碟剩餘空間，防止因硬碟滿了導致失敗
-    - name: 檢查磁碟空間 (Check space usage)
+    - name: Check space usage
       if: (!cancelled())
       run: df -hT
 
-    # 註釋：將編譯出的全部 bin 檔案（包含大量的單獨 ipk 安裝包）打包上傳到 Actions 構件中，預設為關閉
-    - name: 上傳 bin 目錄 (Upload bin directory)
+    - name: Upload bin directory
       uses: actions/upload-artifact@v4
       if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
       with:
         name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
         path: openwrt/bin
 
-    # 註釋：進入固件輸出目錄，剔除不需要的軟體包目錄，精簡結構，準備最終的固件打包
-    - name: 整理固件檔案 (Organize files)
+    - name: Organize files
       id: organize
-      if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
+      if: steps.compile.outputs.status == 'success' && env.UPLOAD_FIRMWARE == 'true' && !cancelled()
       run: |
         cd openwrt/bin/targets/*/*
         rm -rf packages
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
 
-    # 註釋：將整理好的最終路由固件（如 .img / .bin 檔案）上傳到 Actions Artifacts，可在當前頁面直接下載
-    - name: 上傳固件目錄 (Upload firmware directory)
+    - name: Upload firmware directory
       uses: actions/upload-artifact@v4
       if: steps.organize.outputs.status == 'success' && !cancelled()
       with:
-        name: ImmortalWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
+        name: LEDE_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
         path: ${{ env.FIRMWARE }}
 
-    # 註釋：根據當前系統時間動態生成一個唯一的 Release 版本標籤（Tag）
-    - name: 生成發佈標籤 (Generate release tag)
+    - name: Generate release tag
       id: tag
-      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+      if: steps.compile.outputs.status == 'success' && env.UPLOAD_RELEASE == 'true' && !cancelled()
       run: |
-        echo "release_tag=ImmortalWrt-$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
+        echo "release_tag=LEDE-$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
         touch release.txt
         echo "status=success" >> $GITHUB_OUTPUT
 
-    # 註釋：將編譯好的固件發佈到你倉庫的 Releases 頁面，實現永久在線保存與版本迭代
-    - name: 上傳固件至 Release (Upload firmware to release)
+    - name: Upload firmware to release
       uses: softprops/action-gh-release@v2
-      if: steps.tag.outputs.status == 'success' && !cancelled()
+      if: steps.compile.outputs.status == 'success' && steps.tag.outputs.status == 'success' && !cancelled()
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        name: 天灵 ImmortalWrt 固件 ${{ steps.tag.outputs.release_tag }}
+        name: LEDE 固件 ${{ steps.tag.outputs.release_tag }}
         tag_name: ${{ steps.tag.outputs.release_tag }}
         body_path: release.txt
         files: ${{ env.FIRMWARE }}/*
 
-    # 註釋：自動清理此工作流歷史舊的運行記錄（Run History），避免 Actions 頁面過於雜亂
-    - name: 刪除舊的工作流記錄 (Delete workflow runs)
+    - name: Delete workflow runs
       uses: Mattraks/delete-workflow-runs@v2
       with:
         retain_days: 0
         keep_minimum_runs: 2
 
-    # 註釋：自動清理 Releases 頁面中過期的歷史固件及對應的 Git Tag，預設只保留最新上傳的 3 個版本
-    - name: 移除歷史發佈版本 (Remove old Releases)
+    - name: Remove old Releases
       uses: actions/github-script@v7
-      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+      if: steps.compile.outputs.status == 'success' && env.UPLOAD_RELEASE == 'true' && !cancelled()
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
@@ -241,35 +187,38 @@ jobs:
             repo: context.repo.repo,
           });
           
-          const KEEP_LATEST = 3; // 想要多留幾個固件可以在這裡修改數字
+          const KEEP_LATEST = 3;
           
           if (releases.length > KEEP_LATEST) {
-            const toDelete = releases.slice(KEEP_LATEST);
-            for (const release of toDelete) {
-              console.log(`Processing deletion for old release: ${release.tag_name}`);
+            for (let i = KEEP_LATEST; i < releases.length; i++) {
+              const release = releases[i];
+              console.log(`正在删除旧版本: ${release.tag_name}`);
               
-              // 1. 刪除過期的 Release 記錄
-              try {
-                await github.rest.repos.deleteRelease({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  release_id: release.id,
-                });
-                console.log(`Successfully deleted release record: ${release.tag_name}`);
-              } catch (err) {
-                console.error(`Failed to delete release record ${release.tag_name}: ${err.message}`);
-              }
+              await github.rest.repos.deleteRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: release.id
+              });
               
-              // 2. 刪除對應的 Git Tag
               try {
                 await github.rest.git.deleteRef({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  ref: `tags/${release.tag_name}`,
+                  ref: `tags/${release.tag_name}`
                 });
-                console.log(`Successfully deleted Git tag: ${release.tag_name}`);
+                console.log(`成功删除标签: ${release.tag_name}`);
               } catch (error) {
-                console.error(`Failed to delete Git tag ${release.tag_name}: ${error.message}`);
+                console.log(`删除标签失败 (可能已被删除): ${error.message}`);
               }
             }
+          } else {
+            console.log("当前版本数量未超过保留限制，无需清理。");
           }
+    - name: 发送 Telegram 编译成功通知
+      if: success()
+      run: |
+          MSG="🅱️ 恭喜主人！LEDE固件最新版编译完成！🎉%0A%0A⏰ 编译时间：$(date -d '8 hour' +'%Y-%m-%d %H:%M:%S')%0A🌐 日志与固件下载：https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d "text=${MSG}"
