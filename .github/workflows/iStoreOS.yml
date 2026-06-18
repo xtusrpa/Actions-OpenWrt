@@ -10,7 +10,7 @@
 # See /LICENSE for more information.
 #
 
-name: iStoreOS 固件编译流水线 (Node24 修复版)
+name: iStoreOS 固件编译流水线
 
 on:
   repository_dispatch:
