@@ -44,9 +44,11 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
+    # [作用说明] 检出（拉取）当前 GitHub 仓库的代码到运行环境中。
     - name: Checkout
       uses: actions/checkout@v4
 
+    # [作用说明] 释放 Ubuntu 运行环境的磁盘空间，清理多余的大型软件包，防止编译 iStoreOS 时因磁盘空间不足而报错。
     - name: Free Disk Space (Ubuntu)
       uses: jlumbroso/free-disk-space@main
       with:
@@ -58,6 +60,7 @@ jobs:
         docker-images: true
         swap-storage: true
 
+    # [作用说明] 初始化编译环境，安装编译 OpenWrt/iStoreOS 固件所需的所有底层依赖包（如 gcc, git, ccache 等）。
     - name: Initialization environment
       env:
         DEBIAN_FRONTEND: noninteractive
@@ -72,6 +75,7 @@ jobs:
         sudo mkdir -p /workdir
         sudo chown $USER:$GROUPS /workdir
 
+    # [作用说明] 从官方 GitHub 仓库克隆 iStoreOS 的基础源码到工作目录中。
     - name: Clone source code
       working-directory: /workdir
       run: |
@@ -79,6 +83,7 @@ jobs:
         git clone $REPO_URL -b $REPO_BRANCH openwrt
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
+    # [作用说明] 加载您可能自定义的 feeds 配置文件，并执行第一部分自定义脚本 (diy-part1.sh)，通常用于添加第三方插件库（如 helloworld）。
     - name: Load custom feeds
       run: |
         [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
@@ -86,12 +91,22 @@ jobs:
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P1_SH
 
+    # [作用说明] 更新所有 feeds 源（拉取所有插件源码的最新的列表）。
     - name: Update feeds
       run: cd openwrt && ./scripts/feeds update -a
 
+    # [作用说明] 替换并升级编译环境中的 Go 语言版本到 1.24.x，解决最新版 mosdns、OpenClash 等插件因 Go 版本过低(1.23)导致的编译失败。
+    - name: Upgrade Go to 1.24.x
+      run: |
+        cd openwrt
+        rm -rf feeds/packages/lang/golang
+        git clone https://github.com/sbwml/packages_lang_golang -b 24.x feeds/packages/lang/golang
+
+    # [作用说明] 将 feeds 中更新好的源码链接到系统内部，准备后续正式编译。
     - name: Install feeds
       run: cd openwrt && ./scripts/feeds install -a
 
+    # [作用说明] 加载自定义的编译配置文件 (.config)，应用预设的路由器 IP 或密码设置，并执行第二部分自定义脚本 (diy-istoreos.sh)。
     - name: Load custom configuration
       run: |
         [ -e files ] && mv files openwrt/files
@@ -100,10 +115,12 @@ jobs:
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
+    # [作用说明] 提供 tmate 的 SSH 后门接入功能。如果在触发流水线时勾选了 SSH 选项，编译到这里会暂停，让您通过终端连入服务器进行手动调试。
     - name: SSH connection to Actions
       uses: mxschmitt/action-tmate@v3
       if: (github.event.inputs.ssh == 'true' && github.event.inputs.ssh != 'false') || contains(github.event.action, 'ssh')
-       
+        
+    # [作用说明] 提前下载编译所需的所有文件（dl目录中的压缩包）。这一步可以显著减少正式编译时的网络报错，并加快多线程编译速度。
     - name: Download package
       id: package
       run: |
@@ -113,6 +130,7 @@ jobs:
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
 
+    # [作用说明] 最核心的环节：调用系统所有 CPU 核心（多线程）开始编译固件。如果多线程失败，则会自动降级为单线程 (make -j1) 打印详细错误以排查问题。
     - name: Compile the firmware
       id: compile
       run: |
@@ -124,10 +142,12 @@ jobs:
         [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
         echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
 
+    # [作用说明] 在编译完成后，输出一下当前机器的磁盘剩余空间，方便遇到空间不够报错时进行诊断。
     - name: Check space usage
       if: (!cancelled())
       run: df -hT
 
+    # [作用说明] （根据顶部设置 UPLOAD_BIN_DIR 决定是否执行）如果开启，则将包含了所有生成的 ipk 安装包的整个 bin 目录上传到 Action 附件中。
     - name: Upload bin directory
       uses: actions/upload-artifact@v4
       if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
@@ -135,6 +155,7 @@ jobs:
         name: iStoreOS_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
         path: openwrt/bin
 
+    # [作用说明] 剔除临时生成的多余 ipk 包文件，单独把我们需要刷机使用的核心固件（img 等格式）整理提取出来，缩小上传体积。
     - name: Organize files
       id: organize
       if: steps.compile.outputs.status == 'success' && env.UPLOAD_FIRMWARE == 'true' && !cancelled()
@@ -144,6 +165,7 @@ jobs:
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
 
+    # [作用说明] 将整理好的最终固件打包，并上传到当前流水线页面下方的 Artifacts (附件) 中供直接下载。
     - name: Upload firmware directory
       uses: actions/upload-artifact@v4
       if: steps.organize.outputs.status == 'success' && !cancelled()
@@ -151,6 +173,7 @@ jobs:
         name: iStoreOS_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
         path: ${{ env.FIRMWARE }}
 
+    # [作用说明] 使用当前的时间戳生成一个唯一的版本号标签 (Tag)，例如 iStoreOS-2026.06.19-2100，并创建一个 release.txt 占位文件。
     - name: Generate release tag
       id: tag
       if: steps.compile.outputs.status == 'success' && env.UPLOAD_RELEASE == 'true' && !cancelled()
@@ -159,66 +182,4 @@ jobs:
         touch release.txt
         echo "status=success" >> $GITHUB_OUTPUT
 
-    - name: Upload firmware to release
-      uses: softprops/action-gh-release@v2
-      if: steps.compile.outputs.status == 'success' && steps.tag.outputs.status == 'success' && !cancelled()
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        name: iStoreOS 固件 ${{ steps.tag.outputs.release_tag }}
-        tag_name: ${{ steps.tag.outputs.release_tag }}
-        body_path: release.txt
-        files: ${{ env.FIRMWARE }}/*
-
-    - name: Delete workflow runs
-      uses: Mattraks/delete-workflow-runs@v2
-      with:
-        retain_days: 0
-        keep_minimum_runs: 2
-
-    - name: Remove old Releases
-      uses: actions/github-script@v7
-      if: steps.compile.outputs.status == 'success' && env.UPLOAD_RELEASE == 'true' && !cancelled()
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        script: |
-          const { data: releases } = await github.rest.repos.listReleases({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-          });
-           
-          const KEEP_LATEST = 10;
-           
-          if (releases.length > KEEP_LATEST) {
-            for (let i = KEEP_LATEST; i < releases.length; i++) {
-              const release = releases[i];
-              console.log(`正在删除旧版本: ${release.tag_name}`);
-               
-              await github.rest.repos.deleteRelease({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                release_id: release.id
-              });
-               
-              try {
-                await github.rest.git.deleteRef({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  ref: `tags/${release.tag_name}`
-                });
-                console.log(`成功删除标签: ${release.tag_name}`);
-              } catch (error) {
-                console.log(`删除标签失败 (可能已被删除): ${error.message}`);
-              }
-            }
-          } else {
-            console.log("当前版本数量未超过保留限制，无需清理。");
-          }
-    - name: 发送 Telegram 编译成功通知
-      if: success()
-      run: |
-          MSG="🅱️ 恭喜主人！iStoreOS固件最新版编译完成！🎉%0A%0A⏰ 编译时间：$(date -d '8 hour' +'%Y-%m-%d %H:%M:%S')%0A🌐 日志与固件下载：https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-           
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-            -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -d "text=${MSG}"
+    # [作用说明] 将固件推送发布到该 GitHub 仓库的 Releases 页面（
