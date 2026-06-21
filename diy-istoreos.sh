@@ -27,33 +27,6 @@
 # =================================================================
 sed -i 's/OpenWrt/xtusrpa-IStoreos/g' package/base-files/files/bin/config_generate
 
-
-# =================================================================
-# 4. 建立 OpenClash 核心存放目录
-# =================================================================
-mkdir -p files/etc/openclash/core
-
-
-# =================================================================
-# 5. 下载 Meta 核心 (适用于 x86_64 虚拟机)
-# =================================================================
-echo "Downloading Meta Core..."
-wget -qO- https://raw.githubusercontent.com/vernesong/OpenClash/core/master/meta/clash-linux-amd64.tar.gz | tar xOvz > files/etc/openclash/core/clash_meta
-
-
-# =================================================================
-# 6. 下载 Premium (TUN) 核心 (适用于 x86_64 虚拟机)
-# =================================================================
-echo "Downloading TUN Core..."
-wget -qO- https://raw.githubusercontent.com/vernesong/OpenClash/core/master/premium/clash-linux-amd64-2023.08.17.tar.gz | tar xOvz > files/etc/openclash/core/clash_tun
-
-
-# =================================================================
-# 7. 赋予核心最高执行权限
-# =================================================================
-chmod +x files/etc/openclash/core/clash*
-
-
 # =================================================================
 # 8. 终极网络基建：开机强制接管 LAN 口全部配置（帝王级写法）
 # =================================================================
