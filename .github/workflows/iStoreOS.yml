@@ -121,11 +121,20 @@ jobs:
     # 【核心修改】在此处增加 sed 命令，确保 .config 文件里绝对没有勾选这两个插件。
     - name: Load custom configuration
       run: |
-        [ -e files ] && mv files openwrt/files
-        [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
-        chmod +x $DIY_P2_SH
-        cd openwrt
-        $GITHUB_WORKSPACE/$DIY_P2_SH
+       # 移动自定义 files 文件夹
+        [ -e files ] && mv files openwrt/files || true
+    
+       # 移动配置文件
+        [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config || true
+    
+       chmod +x $DIY_P2_SH
+    
+       cd openwrt
+    
+     # 执行自定义脚本
+     $GITHUB_WORKSPACE/$DIY_P2_SH
+    
+     echo "✅ diy-istoreos.sh 执行完成
         
         # 强制清理 .config 中的残留配置
         sed -i 's/CONFIG_PACKAGE_mosdns=y/# CONFIG_PACKAGE_mosdns is not set/g' .config || true
