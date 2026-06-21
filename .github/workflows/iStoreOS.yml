@@ -82,6 +82,14 @@ jobs:
         git clone $REPO_URL -b $REPO_BRANCH openwrt
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
+    # =================================================================
+    # 4.5 强行植入 OpenClash 源码（卡在拉取源码后，更新 feeds 前）
+    # =================================================================
+    - name: Add OpenClash source
+      run: |
+        cd openwrt
+        git clone --depth=1 -b master https://github.com/vernesong/OpenClash.git package/luci-app-openclash
+
     # 5. 加载自定义 feeds 配置并执行 diy-part1.sh
     - name: Load custom feeds
       run: |
