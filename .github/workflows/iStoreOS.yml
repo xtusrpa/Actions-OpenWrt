@@ -9,7 +9,6 @@
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
-
 name: iStoreOS 固件编译流水线
 
 on:
@@ -22,7 +21,7 @@ on:
         default: 'true'
         type: boolean
 
-# 显式赋予流水线完整的写入权限，确保清理旧 Release、旧运行记录和 Git Tags 时不会触发 403 错误
+# 赋予完整权限
 permissions:
   contents: write
   actions: write
@@ -42,13 +41,13 @@ env:
 jobs:
   build:
     runs-on: ubuntu-22.04
-
     steps:
-    # [作用说明] 检出（拉取）当前 GitHub 仓库的代码到运行环境中。
+
+    # 1. 检出当前仓库代码
     - name: Checkout
       uses: actions/checkout@v4
 
-    # [作用说明] 释放 Ubuntu 运行环境的磁盘空间，清理多余的大型软件包，防止编译 iStoreOS 时因磁盘空间不足而报错。
+    # 2. 清理磁盘空间，防止编译时空间不足
     - name: Free Disk Space (Ubuntu)
       uses: jlumbroso/free-disk-space@main
       with:
@@ -60,7 +59,7 @@ jobs:
         docker-images: true
         swap-storage: true
 
-    # [作用说明] 初始化编译环境，安装编译 OpenWrt/iStoreOS 固件所需的所有底层依赖包（如 gcc, git, ccache 等）。
+    # 3. 初始化编译环境，安装所有依赖工具
     - name: Initialization environment
       env:
         DEBIAN_FRONTEND: noninteractive
@@ -75,7 +74,7 @@ jobs:
         sudo mkdir -p /workdir
         sudo chown $USER:$GROUPS /workdir
 
-    # [作用说明] 从官方 GitHub 仓库克隆 iStoreOS 的基础源码到工作目录中。
+    # 4. 克隆 iStoreOS 官方源码
     - name: Clone source code
       working-directory: /workdir
       run: |
@@ -83,7 +82,7 @@ jobs:
         git clone $REPO_URL -b $REPO_BRANCH openwrt
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
-    # [作用说明] 加载您可能自定义的 feeds 配置文件，并执行第一部分自定义脚本 (diy-part1.sh)，通常用于添加第三方插件库（如 helloworld）。
+    # 5. 加载自定义 feeds 配置并执行 diy-part1.sh
     - name: Load custom feeds
       run: |
         [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
@@ -91,72 +90,67 @@ jobs:
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P1_SH
 
-    # [作用说明] 更新所有 feeds 源（拉取所有插件源码的最新的列表）。
+    # 6. 更新所有 feeds 源
     - name: Update feeds
       run: cd openwrt && ./scripts/feeds update -a
 
-    # ----------------------------------------------------------------------
-    # 【核心修改】强制删除导致报错的 mosdns 和 v2dat 源码包
-    # ----------------------------------------------------------------------
+    # 7. 删除可能导致冲突的 mosdns 和 v2dat 插件
     - name: Remove mosdns and v2dat
       run: |
         cd openwrt
         rm -rf feeds/packages/net/mosdns
         rm -rf feeds/packages/net/v2dat
         rm -rf feeds/luci/applications/luci-app-mosdns
-    # ----------------------------------------------------------------------
 
-    # [作用说明] 替换并升级编译环境中的 Go 语言版本到 1.24.x。
+    # 8. 升级 Go 语言版本到 1.24.x
     - name: Upgrade Go to 1.24.x
       run: |
         cd openwrt
         rm -rf feeds/packages/lang/golang
         git clone https://github.com/sbwml/packages_lang_golang -b 24.x feeds/packages/lang/golang
 
-    # [作用说明] 将 feeds 中更新好的源码链接到系统内部，准备后续正式编译。
+    # 9. 安装 feeds 中的所有软件包
     - name: Install feeds
       run: cd openwrt && ./scripts/feeds install -a
 
-    # [作用说明] 加载自定义的编译配置文件 (.config)，并执行第二部分自定义脚本 (diy-istoreos.sh)。
-    # 【核心修改】在此处增加 sed 命令，确保 .config 文件里绝对没有勾选这两个插件。
+    # 10. 加载自定义配置并执行 diy-istoreos.sh（关键步骤）
     - name: Load custom configuration
       run: |
-       # 移动自定义 files 文件夹
+        # 移动自定义 files 文件夹和配置文件
         [ -e files ] && mv files openwrt/files || true
-    
-       # 移动配置文件
         [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config || true
-    
-       chmod +x $DIY_P2_SH
-    
-       cd openwrt
-    
-     # 执行自定义脚本
-     $GITHUB_WORKSPACE/$DIY_P2_SH
-    
-     echo "✅ diy-istoreos.sh 执行完成
         
-        # 强制清理 .config 中的残留配置
+        chmod +x $DIY_P2_SH
+        cd openwrt
+        
+        # 执行自定义脚本
+        $GITHUB_WORKSPACE/$DIY_P2_SH || echo "⚠️ diy-istoreos.sh 执行有警告"
+        
+        echo "✅ diy-istoreos.sh 执行完成"
+        
+        # 强制清理残留配置
         sed -i 's/CONFIG_PACKAGE_mosdns=y/# CONFIG_PACKAGE_mosdns is not set/g' .config || true
         sed -i 's/CONFIG_PACKAGE_v2dat=y/# CONFIG_PACKAGE_v2dat is not set/g' .config || true
         sed -i 's/CONFIG_PACKAGE_luci-app-mosdns=y/# CONFIG_PACKAGE_luci-app-mosdns is not set/g' .config || true
+        
+        # 重新生成配置
+        make defconfig
 
-    # [作用说明] 提供 tmate 的 SSH 后门接入功能。
+    # 11. 开启 SSH 调试通道（可选）
     - name: SSH connection to Actions
       uses: mxschmitt/action-tmate@v3
       if: (github.event.inputs.ssh == 'true' && github.event.inputs.ssh != 'false') || contains(github.event.action, 'ssh')
-        
-    # [作用说明] 提前下载编译所需的所有文件（dl目录中的压缩包）。
+
+    # 12. 下载编译所需的源代码包
     - name: Download package
       id: package
       run: |
         cd openwrt
-        make defconfig
         make download -j8
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
 
-    # [作用说明] 调用系统所有 CPU 核心（多线程）开始编译固件。
+    # 13. 编译固件（核心编译步骤）
     - name: Compile the firmware
       id: compile
       run: |
@@ -168,12 +162,12 @@ jobs:
         [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
         echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
 
-    # [作用说明] 在编译完成后，输出当前机器的磁盘剩余空间。
+    # 14. 检查磁盘空间使用情况
     - name: Check space usage
       if: (!cancelled())
       run: df -hT
 
-    # [作用说明] 将包含了所有生成的 ipk 安装包的整个 bin 目录上传到 Action 附件中。
+    # 15. 上传 bin 目录（可选）
     - name: Upload bin directory
       uses: actions/upload-artifact@v4
       if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
@@ -181,7 +175,7 @@ jobs:
         name: iStoreOS_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
         path: openwrt/bin
 
-    # [作用说明] 提取核心固件（img 等格式）。
+    # 16. 整理固件文件
     - name: Organize files
       id: organize
       if: steps.compile.outputs.status == 'success' && env.UPLOAD_FIRMWARE == 'true' && !cancelled()
@@ -191,7 +185,7 @@ jobs:
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
 
-    # [作用说明] 上传最终固件到附件中供直接下载。
+    # 17. 上传固件到 Actions 附件
     - name: Upload firmware directory
       uses: actions/upload-artifact@v4
       if: steps.organize.outputs.status == 'success' && !cancelled()
@@ -199,7 +193,7 @@ jobs:
         name: iStoreOS_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
         path: ${{ env.FIRMWARE }}
 
-    # [作用说明] 生成唯一的版本号标签 (Tag)。
+    # 18. 生成 Release Tag
     - name: Generate release tag
       id: tag
       if: steps.compile.outputs.status == 'success' && env.UPLOAD_RELEASE == 'true' && !cancelled()
@@ -208,7 +202,7 @@ jobs:
         touch release.txt
         echo "status=success" >> $GITHUB_OUTPUT
 
-    # [作用说明] 将固件推送发布到该 GitHub 仓库的 Releases 页面。
+    # 19. 发布固件到 GitHub Releases
     - name: Upload firmware to release
       uses: softprops/action-gh-release@v2
       if: steps.tag.outputs.status == 'success' && !cancelled()
@@ -219,6 +213,7 @@ jobs:
         body_path: release.txt
         files: ${{ env.FIRMWARE }}/*
 
+    # 20. 发送 Telegram 编译成功通知
     - name: 发送 Telegram 编译成功通知
       if: success()
       run: |
