@@ -21,11 +21,16 @@
 # =================================================================
 #sed -i 's/luci-theme-bootstrap/luci-theme-argon/g' feeds/luci/collections/luci/Makefile
 
+# =================================================================
+# 修改路由器主机名称 (Hostname) - 使用 uci-defaults 方式（更可靠）
+# =================================================================
+mkdir -p files/etc/uci-defaults
 
-# =================================================================
-# 3. 修改路由器主机名称 (Hostname)
-# =================================================================
-sed -i 's/OpenWrt/xtusrpa-IStoreos/g' package/base-files/files/bin/config_generate
+cat << "EOF" > files/etc/uci-defaults/99-custom-settings
+#!/bin/sh
+# ==================== 主机名称 ====================
+uci set system.@system[0].hostname='xtusrpa-IStoreos'
+uci commit system
 
 # =================================================================
 # 8. 终极网络基建：开机强制接管 LAN 口全部配置（帝王级写法）
