@@ -89,10 +89,3 @@ exit 0
 EOF
 
 chmod +x files/etc/uci-defaults/99-custom-network
-
-
-# =========================================================
-# 9. 手动拉取 MosDNS 和对应的 Geo 数据库源码
-# =========================================================
-git clone -b v5 https://github.com/sbwml/luci-app-mosdns package/mosdns
-git clone https://github.com/sbwml/v2ray-geodata package/v2ray-geodata
