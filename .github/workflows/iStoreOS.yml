@@ -57,7 +57,7 @@ jobs:
         haskell: true
         large-packages: true
         docker-images: true
-        swap-storage: true
+        swap-storage: false   # <--- 【修正处 1】改为 false，保留系统原生的 4G Swap 缓冲垫
 
     # 3. 初始化编译环境，安装所有依赖工具
     - name: Initialization environment
@@ -121,7 +121,7 @@ jobs:
     - name: Install feeds
       run: cd openwrt && ./scripts/feeds install -a
 
-    # 10. 加载自定义配置并执行 diy-istoreos.sh（关键步骤）
+    # 10. 加载自定义配置并执行 diy-istoreos.sh
     - name: Load custom configuration
       run: |
         # 移动自定义 files 文件夹和配置文件
@@ -158,13 +158,24 @@ jobs:
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
 
+    # 12.5 临时扩充超级虚拟内存，防止 Node.js 暴毙
+    # <--- 【修正处 2】新增步骤：叠加系统原生4G，编译机此时拥有整整 12GB Swap 兜底
+    - name: Allocate 8G Swap space
+      run: |
+        sudo fallocate -l 8G /swapfile
+        sudo chmod 600 /swapfile
+        sudo mkswap /swapfile
+        sudo swapon /swapfile
+        free -h
+
     # 13. 编译固件（核心编译步骤）
     - name: Compile the firmware
       id: compile
       run: |
         cd openwrt
         echo -e "$(nproc) thread compile"
-        make -j$(nproc) || make -j1 || make -j1 V=s
+        # <--- 【修正处 3】去除中间死锁的 make -j1，一旦报错立刻单线程+全日志大声呼救
+        make -j$(nproc) || make -j1 V=s
         echo "status=success" >> $GITHUB_OUTPUT
         grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
         [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
@@ -227,7 +238,4 @@ jobs:
       run: |
         MSG="🅱️ 恭喜主人！iStoreOS 固件最新版编译完成！🎉%0A%0A⏰ 编译时间：$(date +'%Y-%m-%d %H:%M:%S')%0A🌐 日志与固件下载：https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
         
-        curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-          -H "Content-Type: application/x-www-form-urlencoded" \
-          --data-urlencode "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
-          --data-urlencode "text=${MSG}"
+        curl -s
