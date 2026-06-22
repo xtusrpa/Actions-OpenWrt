@@ -238,4 +238,7 @@ jobs:
       run: |
         MSG="🅱️ 恭喜主人！iStoreOS 固件最新版编译完成！🎉%0A%0A⏰ 编译时间：$(date +'%Y-%m-%d %H:%M:%S')%0A🌐 日志与固件下载：https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
         
-        curl -s
+        curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+          -H "Content-Type: application/x-www-form-urlencoded" \
+          --data-urlencode "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+          --data-urlencode "text=${MSG}"
