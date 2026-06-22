@@ -47,7 +47,7 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
-    # 2. 清理磁盘空间，防止编译时空间不足
+    # 2. 清理磁盘空间（已修正：保留系统原生 4G Swap）
     - name: Free Disk Space (Ubuntu)
       uses: jlumbroso/free-disk-space@main
       with:
@@ -57,7 +57,7 @@ jobs:
         haskell: true
         large-packages: true
         docker-images: true
-        swap-storage: false   # <--- 【修正处 1】改为 false，保留系统原生的 4G Swap 缓冲垫
+        swap-storage: false
 
     # 3. 初始化编译环境，安装所有依赖工具
     - name: Initialization environment
@@ -83,7 +83,7 @@ jobs:
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
     # =================================================================
-    # 4.5 强行植入 OpenClash 源码（卡在拉取源码后，更新 feeds 前）
+    # 4.5 强行植入 OpenClash 源码
     # =================================================================
     - name: Add OpenClash source
       run: |
@@ -158,23 +158,21 @@ jobs:
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
 
-    # 12.5 临时扩充超级虚拟内存，防止 Node.js 暴毙
-    # <--- 【修正处 2】新增步骤：叠加系统原生4G，编译机此时拥有整整 12GB Swap 兜底
-    - name: Allocate 8G Swap space
+    # 12.5 叠加创建第二虚拟内存（已避开 /swapfile 占用，带 dd 硬凿兜底）
+    - name: Allocate extra Swap space
       run: |
-        sudo fallocate -l 8G /swapfile
-        sudo chmod 600 /swapfile
-        sudo mkswap /swapfile
-        sudo swapon /swapfile
+        sudo fallocate -l 8G /swapfile_extra || sudo dd if=/dev/zero of=/swapfile_extra bs=1M count=8192 status=progress
+        sudo chmod 600 /swapfile_extra
+        sudo mkswap /swapfile_extra
+        sudo swapon /swapfile_extra
         free -h
 
-    # 13. 编译固件（核心编译步骤）
+    # 13. 编译固件（已修正：去套娃，失败即吐全日志）
     - name: Compile the firmware
       id: compile
       run: |
         cd openwrt
         echo -e "$(nproc) thread compile"
-        # <--- 【修正处 3】去除中间死锁的 make -j1，一旦报错立刻单线程+全日志大声呼救
         make -j$(nproc) || make -j1 V=s
         echo "status=success" >> $GITHUB_OUTPUT
         grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
