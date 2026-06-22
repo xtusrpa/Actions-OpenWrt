@@ -48,3 +48,13 @@ EOF
 chmod +x files/etc/uci-defaults/99-custom-network
 
 echo "✅ 自定义 uci-defaults 文件创建并赋予权限完成"
+
+# 1. 给 OpenClash 创建预置内核的目录
+CORE_DIR="package/luci-app-openclash/root/etc/openclash/core"
+mkdir -p $CORE_DIR
+
+# 2. 从 OpenClash 官方指定的内核库，下载 x86_64(amd64) 架构的 Meta 内核
+wget -qO- https://raw.githubusercontent.com/vernesong/OpenClash/core/master/meta/clash-linux-amd64.tar.gz | tar xOvz > $CORE_DIR/clash_meta
+
+# 3. 赋予内核执行权限
+chmod +x $CORE_DIR/clash_meta
