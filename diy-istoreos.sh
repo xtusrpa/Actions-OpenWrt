@@ -58,3 +58,6 @@ wget -qO- https://raw.githubusercontent.com/vernesong/OpenClash/core/master/meta
 
 # 3. 赋予内核执行权限
 chmod +x $CORE_DIR/clash_meta
+
+# 解锁网易灰色歌曲在 diy-part2.sh 中加入：
+git clone https://github.com/UnblockNeteaseMusic/luci-app-unblockneteasemusic.git package/luci-app-unblockneteasemusic
